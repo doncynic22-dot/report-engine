@@ -108,25 +108,68 @@ export default function App() {
       const sGrades = await fetchSupabaseGrades();
       const sAttendance = await fetchSupabaseAttendance();
 
+      // Read current values from localStorage to avoid stale state closure issues
+      const cachedStudentsStr = localStorage.getItem('ea_students');
+      const localStudents: Student[] = cachedStudentsStr ? JSON.parse(cachedStudentsStr) : [];
+
+      const cachedTeachersStr = localStorage.getItem('ea_teachers');
+      const localTeachers: User[] = cachedTeachersStr ? JSON.parse(cachedTeachersStr) : [];
+
+      const cachedGradesStr = localStorage.getItem('ea_grades');
+      const localGrades: Grade[] = cachedGradesStr ? JSON.parse(cachedGradesStr) : [];
+
+      const cachedAttendanceStr = localStorage.getItem('ea_attendance');
+      const localAttendance: Attendance[] = cachedAttendanceStr ? JSON.parse(cachedAttendanceStr) : [];
+
       if (sConfig) {
         setConfig(sConfig);
         localStorage.setItem('ea_config', JSON.stringify(sConfig));
+      } else {
+        const cachedConfigStr = localStorage.getItem('ea_config');
+        if (cachedConfigStr) {
+          const localConfig = JSON.parse(cachedConfigStr);
+          await saveSupabaseConfig(localConfig);
+        }
       }
+
       if (sStudents) {
-        setStudents(sStudents);
-        localStorage.setItem('ea_students', JSON.stringify(sStudents));
+        if (sStudents.length === 0 && localStudents.length > 0) {
+          // Supabase is empty, seed it with local students
+          await saveSupabaseStudents(localStudents);
+        } else {
+          setStudents(sStudents);
+          localStorage.setItem('ea_students', JSON.stringify(sStudents));
+        }
       }
+
       if (sTeachers) {
-        setTeachers(sTeachers);
-        localStorage.setItem('ea_teachers', JSON.stringify(sTeachers));
+        if (sTeachers.length === 0 && localTeachers.length > 0) {
+          // Seed Supabase with local teachers
+          await saveSupabaseTeachers(localTeachers);
+        } else {
+          setTeachers(sTeachers);
+          localStorage.setItem('ea_teachers', JSON.stringify(sTeachers));
+        }
       }
+
       if (sGrades) {
-        setGrades(sGrades);
-        localStorage.setItem('ea_grades', JSON.stringify(sGrades));
+        if (sGrades.length === 0 && localGrades.length > 0) {
+          // Seed Supabase with local grades
+          await saveSupabaseGrades(localGrades);
+        } else {
+          setGrades(sGrades);
+          localStorage.setItem('ea_grades', JSON.stringify(sGrades));
+        }
       }
+
       if (sAttendance) {
-        setAttendance(sAttendance);
-        localStorage.setItem('ea_attendance', JSON.stringify(sAttendance));
+        if (sAttendance.length === 0 && localAttendance.length > 0) {
+          // Seed Supabase with local attendance records
+          await saveSupabaseAttendance(localAttendance);
+        } else {
+          setAttendance(sAttendance);
+          localStorage.setItem('ea_attendance', JSON.stringify(sAttendance));
+        }
       }
 
       setIsSupabaseSyncing(false);

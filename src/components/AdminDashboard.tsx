@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Student, User, Subject, ReportConfig, Grade, Attendance, AcademicLevel } from '../types';
-import { Users, GraduationCap, School, BookOpen, Settings, Search, Plus, Edit2, Trash2, Sliders, Check, AlertCircle, FileSpreadsheet, Upload, Image as ImageIcon, X, LogOut, Database, RefreshCw, Copy, CheckCircle2, ChevronRight, HelpCircle, Lock } from 'lucide-react';
+import { Users, GraduationCap, School, BookOpen, Settings, Search, Plus, Edit2, Trash2, Sliders, Check, AlertCircle, FileSpreadsheet, Upload, Download, Image as ImageIcon, X, LogOut, Database, RefreshCw, Copy, CheckCircle2, ChevronRight, HelpCircle, Lock } from 'lucide-react';
 import ReportPDF from './ReportPDF';
 import { getSupabaseCredentials, SUPABASE_SQL_SCHEMA, getSupabaseClient } from '../lib/supabase';
 
@@ -138,6 +138,37 @@ export default function AdminDashboard({
     setCurrentAdminPassInput('');
     setNewAdminPassInput('');
     setConfirmAdminPassInput('');
+  };
+
+  const handleSaveSupabaseCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestStatus({ type: null, msg: '' });
+    
+    localStorage.setItem('ea_supabase_url', dbSupabaseUrl.trim());
+    localStorage.setItem('ea_supabase_anon_key', dbSupabaseAnonKey.trim());
+    
+    if (onCheckSupabaseStatus) {
+      const active = await onCheckSupabaseStatus();
+      if (active) {
+        setTestStatus({ type: 'success', msg: 'Successfully connected and updated Supabase Configuration! Automatic live-sync is active.' });
+        if (onPullFromSupabase) {
+          await onPullFromSupabase();
+        }
+      } else {
+        setTestStatus({ type: 'error', msg: 'Failed to connect. Please verify that your Supabase URL, Anon Key are valid and tables are setup.' });
+      }
+    }
+  };
+
+  const handleResetSupabaseCredentials = async () => {
+    localStorage.removeItem('ea_supabase_url');
+    localStorage.removeItem('ea_supabase_anon_key');
+    setDbSupabaseUrl('');
+    setDbSupabaseAnonKey('');
+    setTestStatus({ type: 'success', msg: 'Reset to default Academy shared database.' });
+    if (onCheckSupabaseStatus) {
+      await onCheckSupabaseStatus();
+    }
   };
 
 
@@ -952,7 +983,7 @@ export default function AdminDashboard({
                         className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white"
                       >
                         <option value="NURSERY">Nursery & KG</option>
-                        <option value="PRIMARY">Primary Six</option>
+                        <option value="PRIMARY">PrimARY</option>
                         <option value="JHS">Junior High (JHS)</option>
                       </select>
                     </div>
@@ -991,12 +1022,12 @@ export default function AdminDashboard({
                     />
                   </div>
 
-                  {/* Guardian Email */}
+                  {/* Guardian Contact */}
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-mauve-700 block">Guardian Contact Email</label>
+                    <label className="text-xs font-semibold text-mauve-700 block">Guardian Contact</label>
                     <input
-                      type="email"
-                      placeholder="guardian@example.com"
+                      type="text"
+                      placeholder="e.g. +233 XX XXX XXXX or email"
                       value={studentForm.guardianEmail}
                       onChange={(e) => setStudentForm({ ...studentForm, guardianEmail: e.target.value })}
                       className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white"
@@ -1572,6 +1603,180 @@ export default function AdminDashboard({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* F. SUPABASE CLOUD DATABASE SYNC ENGINE */}
+          <div className="pt-6 border-t border-mauve-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-mauve-900" />
+                <h4 className="font-display font-bold text-mauve-900 text-sm uppercase tracking-wider">Supabase Cloud Database Integration</h4>
+              </div>
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                supabaseStatus?.isConnected 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : supabaseStatus?.isConfigured 
+                    ? 'bg-amber-100 text-amber-800' 
+                    : 'bg-rose-100 text-rose-800'
+              }`}>
+                {supabaseStatus?.isConnected 
+                  ? '● Live Sync Online' 
+                  : supabaseStatus?.isConfigured 
+                    ? '● Offline (Config Error)' 
+                    : '● Shared Default DB'}
+              </span>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Configure your own personal Supabase database to persist all reports, class grades, student admissions, and staff data permanently. Standard live sync operates in the background automatically as you record grades or edit student files.
+            </p>
+
+            {/* Sync Controls (Push & Pull) */}
+            <div className="p-4 bg-mauve-50/40 rounded-xl border border-mauve-100 space-y-3.5">
+              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Manual Synchronization Commands</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+                <div className="space-y-1">
+                  <span className="font-bold text-gray-800">1. Push Local State to Cloud</span>
+                  <p className="text-[11px] text-gray-500 leading-normal">
+                    Overwrites remote database tables with your current browser local storage database. Use this to seed a newly created database.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isSupabaseSyncing}
+                    onClick={async () => {
+                      if (onPushToSupabase) {
+                        const ok = await onPushToSupabase();
+                        if (ok) {
+                          alert('Successfully synchronized and uploaded all local records to your Supabase Cloud Database!');
+                        } else {
+                          alert('Push failed. Ensure your database tables are created correctly using the SQL Schema below.');
+                        }
+                      }
+                    }}
+                    className="mt-1.5 px-3 py-1.5 bg-mauve-900 hover:bg-mauve-700 disabled:opacity-50 text-white font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> Push Local Data to Cloud
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="font-bold text-gray-800">2. Pull Remote State to Browser</span>
+                  <p className="text-[11px] text-gray-500 leading-normal">
+                    Downloads the latest synchronized student registers, staff allocations, and grading sheets from Supabase, updating your browser storage.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isSupabaseSyncing}
+                    onClick={async () => {
+                      if (onPullFromSupabase) {
+                        const ok = await onPullFromSupabase();
+                        if (ok) {
+                          alert('Successfully downloaded and synchronized latest cloud database records!');
+                        } else {
+                          alert('Pull failed. Ensure your database connection is active and tables exist.');
+                        }
+                      }
+                    }}
+                    className="mt-1.5 px-3 py-1.5 bg-white hover:bg-mauve-50 disabled:opacity-50 text-mauve-900 border border-mauve-300 font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Pull Cloud Data to Browser
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Database Credentials Form */}
+            <form onSubmit={handleSaveSupabaseCredentials} className="space-y-3.5 text-xs border border-mauve-100 rounded-xl p-4 bg-white shadow-sm">
+              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Connect Your Custom Supabase Project</span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-mauve-700 block">Supabase Project URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://your-project.supabase.co"
+                    value={dbSupabaseUrl}
+                    onChange={(e) => setDbSupabaseUrl(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none font-mono text-xs bg-white text-mauve-900"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-mauve-700 block">Supabase Anon Key</label>
+                  <input
+                    type="password"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX..."
+                    value={dbSupabaseAnonKey}
+                    onChange={(e) => setDbSupabaseAnonKey(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none font-mono text-xs bg-white text-mauve-900"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetSupabaseCredentials}
+                  className="px-3.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-[11px] uppercase tracking-wider transition cursor-pointer border border-gray-200"
+                >
+                  Reset to Default DB
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-mauve-900 hover:bg-mauve-700 text-white font-bold rounded-xl text-[11px] uppercase tracking-wider transition cursor-pointer shadow-sm"
+                >
+                  Save & Validate Connection
+                </button>
+              </div>
+
+              {testStatus.type && (
+                <div className={`p-3 rounded text-[11px] border leading-normal ${
+                  testStatus.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-100' 
+                    : 'bg-rose-50 text-rose-800 border-rose-100'
+                }`}>
+                  {testStatus.msg}
+                </div>
+              )}
+            </form>
+
+            {/* SQL Schema Script toggle */}
+            <div className="border border-mauve-100 rounded-xl p-4 bg-white shadow-sm space-y-2.5">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Database Schema Initialization</span>
+                  <span className="text-[10px] text-gray-500">Run this SQL code in your Supabase SQL Editor to configure tables & policies</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSqlSchema(!showSqlSchema)}
+                  className="text-[10px] font-bold uppercase tracking-wider text-mauve-900 bg-mauve-100 px-3 py-1.5 rounded hover:bg-mauve-200 transition cursor-pointer"
+                >
+                  {showSqlSchema ? 'Hide Schema SQL' : 'Show Schema SQL'}
+                </button>
+              </div>
+
+              {showSqlSchema && (
+                <div className="space-y-2.5 animate-fadeIn">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+                        setCopiedSql(true);
+                        setTimeout(() => setCopiedSql(false), 2000);
+                      }}
+                      className="text-[10px] font-bold text-mauve-900 bg-mauve-50 hover:bg-mauve-100 border border-mauve-200 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1"
+                    >
+                      {copiedSql ? '✓ Copied SQL!' : 'Copy SQL Schema'}
+                    </button>
+                  </div>
+                  <pre className="p-3 bg-gray-950 text-gray-200 rounded-lg overflow-auto max-h-60 text-[10px] font-mono leading-normal select-all">
+                    {SUPABASE_SQL_SCHEMA}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
 

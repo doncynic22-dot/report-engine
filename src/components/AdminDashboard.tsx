@@ -255,6 +255,31 @@ export default function AdminDashboard({
 
   const overallAvg = grades.length > 0 ? (grades.reduce((sum, g) => sum + g.totalScore, 0) / grades.length) : 0;
 
+  // Helper to dynamically auto-generate Roll / Register ID
+  const getAutoRollNumber = (level: AcademicLevel, className: string) => {
+    let classAbbr = '';
+    const nameLower = className.toLowerCase();
+    if (nameLower.includes('nursery 1')) classAbbr = 'N1';
+    else if (nameLower.includes('nursery 2')) classAbbr = 'N2';
+    else if (nameLower.includes('kindergarten 1') || nameLower.includes('kg 1')) classAbbr = 'KG1';
+    else if (nameLower.includes('kindergarten 2') || nameLower.includes('kg 2')) classAbbr = 'KG2';
+    else if (nameLower.includes('primary')) {
+      const num = nameLower.replace(/[^0-9]/g, '');
+      classAbbr = `P${num || '1'}`;
+    } else if (nameLower.includes('jhs')) {
+      const num = nameLower.replace(/[^0-9]/g, '');
+      classAbbr = `J${num || '1'}`;
+    } else {
+      classAbbr = level.substring(0, 3).toUpperCase();
+    }
+
+    const year = '2026';
+    const classStudentsCount = students.filter(s => s.className === className).length;
+    const nextSeq = String(classStudentsCount + 1).padStart(3, '0');
+
+    return `EA/${classAbbr}/${year}/${nextSeq}`;
+  };
+
   // 2. STUDENT DIRECTORY LOGIC
   const handleAddOrEditStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -322,7 +347,13 @@ export default function AdminDashboard({
   // Adjust class list in form dynamically based on chosen level
   const handleLevelChangeInForm = (level: AcademicLevel) => {
     const defaultClass = level === 'NURSERY' ? classes.NURSERY[0] : level === 'PRIMARY' ? classes.PRIMARY[0] : classes.JHS[0];
-    setStudentForm(prev => ({ ...prev, level, className: defaultClass }));
+    const autoRoll = getAutoRollNumber(level, defaultClass);
+    setStudentForm(prev => ({
+      ...prev,
+      level,
+      className: defaultClass,
+      rollNumber: editingStudent ? prev.rollNumber : autoRoll
+    }));
   };
 
   // 3. TEACHER DIRECTORY LOGIC
@@ -738,7 +769,17 @@ export default function AdminDashboard({
             <button
               onClick={() => {
                 setEditingStudent(null);
-                setStudentForm({ name: '', rollNumber: '', level: 'PRIMARY', className: 'Primary 1', guardianName: '', guardianEmail: '' });
+                const defaultLevel = 'PRIMARY' as AcademicLevel;
+                const defaultClass = 'Primary 1';
+                const autoRoll = getAutoRollNumber(defaultLevel, defaultClass);
+                setStudentForm({
+                  name: '',
+                  rollNumber: autoRoll,
+                  level: defaultLevel,
+                  className: defaultClass,
+                  guardianName: '',
+                  guardianEmail: ''
+                });
                 setShowStudentModal(true);
               }}
               className="bg-mauve-900 hover:bg-mauve-700 text-white font-bold px-4 py-2 rounded transition flex items-center gap-1.5 cursor-pointer shadow-sm text-xs uppercase tracking-wider"
@@ -885,7 +926,12 @@ export default function AdminDashboard({
 
                   {/* Roll Number */}
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-mauve-700 block">Roll / Register ID</label>
+                    <label className="text-xs font-semibold text-mauve-700 block flex justify-between items-center">
+                      <span>Roll / Register ID</span>
+                      {!editingStudent && (
+                        <span className="text-[10px] text-emerald-600 font-medium">Auto-generated</span>
+                      )}
+                    </label>
                     <input
                       type="text"
                       required
@@ -915,7 +961,15 @@ export default function AdminDashboard({
                       <label className="text-xs font-semibold text-mauve-700 block">Grade Class</label>
                       <select
                         value={studentForm.className}
-                        onChange={(e) => setStudentForm({ ...studentForm, className: e.target.value })}
+                        onChange={(e) => {
+                          const newClass = e.target.value;
+                          const autoRoll = getAutoRollNumber(studentForm.level, newClass);
+                          setStudentForm(prev => ({
+                            ...prev,
+                            className: newClass,
+                            rollNumber: editingStudent ? prev.rollNumber : autoRoll
+                          }));
+                        }}
                         className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white"
                       >
                         {studentForm.level === 'NURSERY' && classes.NURSERY.map(c => <option key={c} value={c}>{c}</option>)}

@@ -201,6 +201,74 @@ ON storage.objects
 FOR DELETE
 TO anon, authenticated, public
 USING (bucket_id = 'eastfield');
+
+-- 7. Row Level Security (RLS) & Policies for all ea_* Tables
+-- Newer Supabase projects automatically enable RLS by default on newly created tables.
+-- To allow your frontend app to synchronize data, you MUST either disable RLS or add public policies.
+
+-- OPTION A: Disable RLS on the tables (Simplest & Recommended for offline-sync app design)
+ALTER TABLE public.ea_config DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ea_students DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ea_teachers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ea_grades DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ea_attendance DISABLE ROW LEVEL SECURITY;
+
+-- OPTION B: Alternatively, if you want to keep RLS active, use these unrestricted policies:
+-- (Uncomment these if you prefer to keep RLS enabled)
+-- ALTER TABLE public.ea_config ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public access on ea_config" ON public.ea_config;
+-- CREATE POLICY "Allow public access on ea_config" ON public.ea_config FOR ALL TO anon, authenticated, public USING (true) WITH CHECK (true);
+
+-- ALTER TABLE public.ea_students ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public access on ea_students" ON public.ea_students;
+-- CREATE POLICY "Allow public access on ea_students" ON public.ea_students FOR ALL TO anon, authenticated, public USING (true) WITH CHECK (true);
+
+-- ALTER TABLE public.ea_teachers ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public access on ea_teachers" ON public.ea_teachers;
+-- CREATE POLICY "Allow public access on ea_teachers" ON public.ea_teachers FOR ALL TO anon, authenticated, public USING (true) WITH CHECK (true);
+
+-- ALTER TABLE public.ea_grades ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public access on ea_grades" ON public.ea_grades;
+-- CREATE POLICY "Allow public access on ea_grades" ON public.ea_grades FOR ALL TO anon, authenticated, public USING (true) WITH CHECK (true);
+
+-- ALTER TABLE public.ea_attendance ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "Allow public access on ea_attendance" ON public.ea_attendance;
+-- CREATE POLICY "Allow public access on ea_attendance" ON public.ea_attendance FOR ALL TO anon, authenticated, public USING (true) WITH CHECK (true);
+
+-- 8. Automated Sync Trigger for Registered Users (Solves syntax errors like 'ERROR: 42601')
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (new.raw_user_meta_data->>'role' = 'TEACHER') THEN
+    INSERT INTO public.ea_teachers (id, name, email, role, level, classes, subjects, password, updated_at)
+    VALUES (
+      new.id,
+      COALESCE(new.raw_user_meta_data->>'name', 'New Teacher'),
+      new.email,
+      'TEACHER',
+      new.raw_user_meta_data->>'level',
+      COALESCE((new.raw_user_meta_data->'classes')::jsonb, '[]'::jsonb),
+      COALESCE((new.raw_user_meta_data->'subjects')::jsonb, '[]'::jsonb),
+      new.raw_user_meta_data->>'password',
+      now()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      email = EXCLUDED.email,
+      level = EXCLUDED.level,
+      classes = EXCLUDED.classes,
+      subjects = EXCLUDED.subjects,
+      password = EXCLUDED.password,
+      updated_at = now();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
 `;
 
 // Helper to verify connection by doing a simple query

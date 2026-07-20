@@ -25,7 +25,11 @@ let lastKey = '';
 function getClientInstance(): SupabaseClient {
   const { url, key } = getSupabaseCredentials();
   if (!cachedClient || url !== lastUrl || key !== lastKey) {
-    cachedClient = createClient(url, key);
+    cachedClient = createClient(url, key, {
+      auth: {
+        persistSession: false
+      }
+    });
     lastUrl = url;
     lastKey = key;
   }

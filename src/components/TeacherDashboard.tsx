@@ -158,6 +158,16 @@ export default function TeacherDashboard({
       const { data, error } = await supabase.auth.signUp({
         email: regEmail,
         password: regPassword,
+        options: {
+          data: {
+            role: 'TEACHER',
+            name: regName,
+            level: regLevel,
+            classes: regSelectedClasses,
+            subjects: finalSubjects,
+            password: regPassword
+          }
+        }
       });
 
       if (error) {

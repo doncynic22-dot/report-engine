@@ -133,32 +133,50 @@ export default function App() {
         await saveSupabaseConfig(localConfig);
       }
 
-      // 2. Sync Students
-      if (sStudents !== null) {
-        if (sStudents.length === 0 && localStudents.length > 0) {
-          // Supabase empty, seed with local cache
-          await saveSupabaseStudents(localStudents);
-        } else {
-          setStudents(sStudents);
-          localStorage.setItem('ea_students', JSON.stringify(sStudents));
-        }
-      } else {
-        // Fallback: Fetch failed, recover using local cache
-        console.warn("Supabase fetch students failed. Recovered from local cache.");
-        setStudents(localStudents);
-      }
-
       // 3. Sync Teachers
+      let activeTeachers = localTeachers;
       if (sTeachers !== null) {
         if (sTeachers.length === 0 && localTeachers.length > 0) {
           await saveSupabaseTeachers(localTeachers);
         } else {
+          activeTeachers = sTeachers;
           setTeachers(sTeachers);
           localStorage.setItem('ea_teachers', JSON.stringify(sTeachers));
         }
       } else {
         console.warn("Supabase fetch teachers failed. Recovered from local cache.");
         setTeachers(localTeachers);
+      }
+
+      // 2. Sync Students
+      if (sStudents !== null) {
+        // Filter out any teacher accounts that may have leaked into students
+        const teacherEmails = new Set(activeTeachers.map(t => t.email.toLowerCase()));
+        const teacherIds = new Set(activeTeachers.map(t => t.id));
+        const cleanStudents = sStudents.filter(
+          s => !teacherIds.has(s.id) && !teacherEmails.has(s.guardianEmail.toLowerCase())
+        );
+
+        if (cleanStudents.length === 0 && localStudents.length > 0) {
+          // Supabase empty, seed with local cache
+          const cleanLocalStudents = localStudents.filter(
+            s => !teacherIds.has(s.id) && !teacherEmails.has(s.guardianEmail.toLowerCase())
+          );
+          await saveSupabaseStudents(cleanLocalStudents);
+          setStudents(cleanLocalStudents);
+        } else {
+          setStudents(cleanStudents);
+          localStorage.setItem('ea_students', JSON.stringify(cleanStudents));
+        }
+      } else {
+        // Fallback: Fetch failed, recover using local cache
+        console.warn("Supabase fetch students failed. Recovered from local cache.");
+        const teacherEmails = new Set(activeTeachers.map(t => t.email.toLowerCase()));
+        const teacherIds = new Set(activeTeachers.map(t => t.id));
+        const cleanLocalStudents = localStudents.filter(
+          s => !teacherIds.has(s.id) && !teacherEmails.has(s.guardianEmail.toLowerCase())
+        );
+        setStudents(cleanLocalStudents);
       }
 
       // 4. Sync Grades
@@ -229,19 +247,6 @@ export default function App() {
     const cachedAttendance = localStorage.getItem('ea_attendance');
     const cachedConfig = localStorage.getItem('ea_config');
 
-    let finalStudents: Student[] = [];
-    if (cachedStudents !== null) {
-      try {
-        finalStudents = JSON.parse(cachedStudents) as Student[];
-      } catch (e) {
-        finalStudents = INITIAL_STUDENTS;
-      }
-    } else {
-      finalStudents = INITIAL_STUDENTS;
-    }
-    setStudents(finalStudents);
-    localStorage.setItem('ea_students', JSON.stringify(finalStudents));
-
     let finalTeachers: User[] = [];
     if (cachedTeachers !== null) {
       try {
@@ -254,6 +259,27 @@ export default function App() {
     }
     setTeachers(finalTeachers);
     localStorage.setItem('ea_teachers', JSON.stringify(finalTeachers));
+
+    let finalStudents: Student[] = [];
+    if (cachedStudents !== null) {
+      try {
+        finalStudents = JSON.parse(cachedStudents) as Student[];
+      } catch (e) {
+        finalStudents = INITIAL_STUDENTS;
+      }
+    } else {
+      finalStudents = INITIAL_STUDENTS;
+    }
+
+    // Filter out any teacher accounts that may have leaked into students
+    const teacherEmails = new Set(finalTeachers.map(t => t.email.toLowerCase()));
+    const teacherIds = new Set(finalTeachers.map(t => t.id));
+    const cleanStudents = finalStudents.filter(
+      s => !teacherIds.has(s.id) && !teacherEmails.has(s.guardianEmail.toLowerCase())
+    );
+
+    setStudents(cleanStudents);
+    localStorage.setItem('ea_students', JSON.stringify(cleanStudents));
 
     let finalGrades: Grade[] = [];
     if (cachedGrades !== null) {
@@ -307,6 +333,17 @@ export default function App() {
   }, []);
 
   // 2. SAVE STATE MUTATIONS BACK TO LOCAL STORAGE AND SUPABASE (AUTO-SYNC)
+  // Ensure we never have teachers registered under students (e.g. from database triggers on signUp)
+  useEffect(() => {
+    if (!isInitialized) return;
+    const teacherEmails = new Set(teachers.map(t => t.email.toLowerCase()));
+    const teacherIds = new Set(teachers.map(t => t.id));
+    const hasOverlap = students.some(s => teacherIds.has(s.id) || teacherEmails.has(s.guardianEmail.toLowerCase()));
+    if (hasOverlap) {
+      setStudents(prev => prev.filter(s => !teacherIds.has(s.id) && !teacherEmails.has(s.guardianEmail.toLowerCase())));
+    }
+  }, [teachers, students, isInitialized]);
+
   useEffect(() => {
     if (!isInitialized) return;
     localStorage.setItem('ea_students', JSON.stringify(students));

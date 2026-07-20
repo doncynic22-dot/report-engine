@@ -24,25 +24,33 @@ export function getSupabaseCredentials() {
 }
 
 let supabaseClientInstance: SupabaseClient | null = null;
+let currentClientUrl = '';
+let currentClientKey = '';
 
 export function getSupabaseClient(): SupabaseClient | null {
   const { url, key, isConfigured } = getSupabaseCredentials();
   if (!isConfigured) {
     supabaseClientInstance = null;
+    currentClientUrl = '';
+    currentClientKey = '';
     return null;
   }
   
-  // Re-create or return current client
-  if (!supabaseClientInstance || supabaseClientInstance.auth === undefined) {
+  // Re-create client if credentials changed or client is not yet created
+  if (!supabaseClientInstance || supabaseClientInstance.auth === undefined || url !== currentClientUrl || key !== currentClientKey) {
     try {
       supabaseClientInstance = createClient(url, key, {
         auth: {
           persistSession: false
         }
       });
+      currentClientUrl = url;
+      currentClientKey = key;
     } catch (e) {
       console.error('Failed to initialize Supabase client:', e);
       supabaseClientInstance = null;
+      currentClientUrl = '';
+      currentClientKey = '';
     }
   }
   return supabaseClientInstance;

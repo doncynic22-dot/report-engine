@@ -92,7 +92,7 @@ export default function App() {
     return result.success;
   };
 
-  // Pull all tables from Supabase
+  // Pull all tables from Supabase with smart fallbacks and automatic seeding
   const handlePullFromSupabase = async () => {
     setIsSupabaseSyncing(true);
     try {
@@ -102,74 +102,89 @@ export default function App() {
         return false;
       }
 
+      // Fetch all remote states from Supabase
       const sConfig = await fetchSupabaseConfig();
       const sStudents = await fetchSupabaseStudents();
       const sTeachers = await fetchSupabaseTeachers();
       const sGrades = await fetchSupabaseGrades();
       const sAttendance = await fetchSupabaseAttendance();
 
-      // Read current values from localStorage to avoid stale state closure issues
+      // Read current values from localStorage (fallback cache)
       const cachedStudentsStr = localStorage.getItem('ea_students');
-      const localStudents: Student[] = cachedStudentsStr ? JSON.parse(cachedStudentsStr) : [];
+      const localStudents: Student[] = cachedStudentsStr ? JSON.parse(cachedStudentsStr) : INITIAL_STUDENTS;
 
       const cachedTeachersStr = localStorage.getItem('ea_teachers');
-      const localTeachers: User[] = cachedTeachersStr ? JSON.parse(cachedTeachersStr) : [];
+      const localTeachers: User[] = cachedTeachersStr ? JSON.parse(cachedTeachersStr) : INITIAL_USERS;
 
       const cachedGradesStr = localStorage.getItem('ea_grades');
-      const localGrades: Grade[] = cachedGradesStr ? JSON.parse(cachedGradesStr) : [];
+      const localGrades: Grade[] = cachedGradesStr ? JSON.parse(cachedGradesStr) : INITIAL_GRADES;
 
       const cachedAttendanceStr = localStorage.getItem('ea_attendance');
-      const localAttendance: Attendance[] = cachedAttendanceStr ? JSON.parse(cachedAttendanceStr) : [];
+      const localAttendance: Attendance[] = cachedAttendanceStr ? JSON.parse(cachedAttendanceStr) : INITIAL_ATTENDANCE;
 
+      // 1. Sync Config
       if (sConfig) {
         setConfig(sConfig);
         localStorage.setItem('ea_config', JSON.stringify(sConfig));
       } else {
+        // Fallback: If config doesn't exist on Supabase, seed it with local config
         const cachedConfigStr = localStorage.getItem('ea_config');
-        if (cachedConfigStr) {
-          const localConfig = JSON.parse(cachedConfigStr);
-          await saveSupabaseConfig(localConfig);
-        }
+        const localConfig = cachedConfigStr ? JSON.parse(cachedConfigStr) : DEFAULT_REPORT_CONFIG;
+        await saveSupabaseConfig(localConfig);
       }
 
-      if (sStudents) {
+      // 2. Sync Students
+      if (sStudents !== null) {
         if (sStudents.length === 0 && localStudents.length > 0) {
-          // Supabase is empty, seed it with local students
+          // Supabase empty, seed with local cache
           await saveSupabaseStudents(localStudents);
         } else {
           setStudents(sStudents);
           localStorage.setItem('ea_students', JSON.stringify(sStudents));
         }
+      } else {
+        // Fallback: Fetch failed, recover using local cache
+        console.warn("Supabase fetch students failed. Recovered from local cache.");
+        setStudents(localStudents);
       }
 
-      if (sTeachers) {
+      // 3. Sync Teachers
+      if (sTeachers !== null) {
         if (sTeachers.length === 0 && localTeachers.length > 0) {
-          // Seed Supabase with local teachers
           await saveSupabaseTeachers(localTeachers);
         } else {
           setTeachers(sTeachers);
           localStorage.setItem('ea_teachers', JSON.stringify(sTeachers));
         }
+      } else {
+        console.warn("Supabase fetch teachers failed. Recovered from local cache.");
+        setTeachers(localTeachers);
       }
 
-      if (sGrades) {
+      // 4. Sync Grades
+      if (sGrades !== null) {
         if (sGrades.length === 0 && localGrades.length > 0) {
-          // Seed Supabase with local grades
           await saveSupabaseGrades(localGrades);
         } else {
           setGrades(sGrades);
           localStorage.setItem('ea_grades', JSON.stringify(sGrades));
         }
+      } else {
+        console.warn("Supabase fetch grades failed. Recovered from local cache.");
+        setGrades(localGrades);
       }
 
-      if (sAttendance) {
+      // 5. Sync Attendance
+      if (sAttendance !== null) {
         if (sAttendance.length === 0 && localAttendance.length > 0) {
-          // Seed Supabase with local attendance records
           await saveSupabaseAttendance(localAttendance);
         } else {
           setAttendance(sAttendance);
           localStorage.setItem('ea_attendance', JSON.stringify(sAttendance));
         }
+      } else {
+        console.warn("Supabase fetch attendance failed. Recovered from local cache.");
+        setAttendance(localAttendance);
       }
 
       setIsSupabaseSyncing(false);
@@ -225,6 +240,9 @@ export default function App() {
       const parsed = JSON.parse(cachedStudents) as Student[];
       finalStudents = parsed.filter(s => !demoStudentIds.includes(s.id));
     }
+    if (finalStudents.length === 0) {
+      finalStudents = INITIAL_STUDENTS;
+    }
     setStudents(finalStudents);
     localStorage.setItem('ea_students', JSON.stringify(finalStudents));
 
@@ -232,6 +250,9 @@ export default function App() {
     if (cachedTeachers) {
       const parsed = JSON.parse(cachedTeachers) as User[];
       finalTeachers = parsed.filter(t => !demoTeacherEmails.includes(t.email.toLowerCase()));
+    }
+    if (finalTeachers.length === 0) {
+      finalTeachers = INITIAL_USERS;
     }
     setTeachers(finalTeachers);
     localStorage.setItem('ea_teachers', JSON.stringify(finalTeachers));
@@ -241,6 +262,9 @@ export default function App() {
       const parsed = JSON.parse(cachedGrades) as Grade[];
       finalGrades = parsed.filter(g => !demoStudentIds.includes(g.studentId));
     }
+    if (finalGrades.length === 0) {
+      finalGrades = INITIAL_GRADES;
+    }
     setGrades(finalGrades);
     localStorage.setItem('ea_grades', JSON.stringify(finalGrades));
 
@@ -248,6 +272,9 @@ export default function App() {
     if (cachedAttendance) {
       const parsed = JSON.parse(cachedAttendance) as Attendance[];
       finalAttendance = parsed.filter(a => !demoStudentIds.includes(a.studentId));
+    }
+    if (finalAttendance.length === 0) {
+      finalAttendance = INITIAL_ATTENDANCE;
     }
     setAttendance(finalAttendance);
     localStorage.setItem('ea_attendance', JSON.stringify(finalAttendance));

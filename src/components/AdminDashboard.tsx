@@ -1632,6 +1632,36 @@ export default function AdminDashboard({
               Configure your own personal Supabase database to persist all reports, class grades, student admissions, and staff data permanently. Standard live sync operates in the background automatically as you record grades or edit student files.
             </p>
 
+            {/* Active Credentials Summary Card */}
+            <div className="p-4 bg-white border border-mauve-100 rounded-xl space-y-2.5 text-xs shadow-sm">
+              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Active Database Profile</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Config Source</span>
+                  <span className="font-bold text-mauve-900 block">
+                    {(() => {
+                      const creds = getSupabaseCredentials();
+                      if (creds.source === 'localStorage') return 'Custom Credentials (Browser)';
+                      if (creds.source === 'env') return 'System Environment (.env)';
+                      return 'Default Academy DB (Shared)';
+                    })()}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Active Project URL</span>
+                  <span className="font-mono text-mauve-900 block truncate" title={getSupabaseCredentials().url}>
+                    {getSupabaseCredentials().url || 'Not configured'}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Anon Key Status</span>
+                  <span className="font-mono text-mauve-900 block">
+                    {getSupabaseCredentials().key ? '•••••••••••••••• (Active)' : 'Not configured'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Sync Controls (Push & Pull) */}
             <div className="p-4 bg-mauve-50/40 rounded-xl border border-mauve-100 space-y-3.5">
               <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Manual Synchronization Commands</span>
@@ -1656,7 +1686,12 @@ export default function AdminDashboard({
                     }}
                     className="mt-1.5 px-3 py-1.5 bg-mauve-900 hover:bg-mauve-700 disabled:opacity-50 text-white font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
                   >
-                    <Upload className="w-3.5 h-3.5" /> Push Local Data to Cloud
+                    {isSupabaseSyncing ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    {isSupabaseSyncing ? 'Syncing...' : 'Push Local Data to Cloud'}
                   </button>
                 </div>
 
@@ -1680,7 +1715,12 @@ export default function AdminDashboard({
                     }}
                     className="mt-1.5 px-3 py-1.5 bg-white hover:bg-mauve-50 disabled:opacity-50 text-mauve-900 border border-mauve-300 font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
                   >
-                    <Download className="w-3.5 h-3.5" /> Pull Cloud Data to Browser
+                    {isSupabaseSyncing ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    {isSupabaseSyncing ? 'Syncing...' : 'Pull Cloud Data to Browser'}
                   </button>
                 </div>
               </div>

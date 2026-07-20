@@ -44,7 +44,13 @@ export const INITIAL_SUBJECTS: Subject[] = [
   { id: 'sub-j-ict', name: 'Computing', code: 'COMP', level: 'JHS' }
 ];
 
-export const INITIAL_STUDENTS: Student[] = [];
+export const INITIAL_STUDENTS: Student[] = [
+  { id: "st-101", name: "Kwame Asante", rollNumber: "ST-001", level: "PRIMARY", className: "Primary 1", guardianName: "Emmanuel Asante", guardianEmail: "emmanuel@asante.com" },
+  { id: "st-102", name: "Ama Boateng", rollNumber: "ST-002", level: "PRIMARY", className: "Primary 1", guardianName: "Kofi Boateng", guardianEmail: "kofi@boateng.com" },
+  { id: "st-103", name: "Kofi Mensah", rollNumber: "ST-003", level: "JHS", className: "JHS 1", guardianName: "Yao Mensah", guardianEmail: "yao@mensah.com" },
+  { id: "st-104", name: "Yaa Asantewaa", rollNumber: "ST-004", level: "JHS", className: "JHS 1", guardianName: "Maame Asantewaa", guardianEmail: "maame@asantewaa.com" },
+  { id: "st-105", name: "Abena Osei", rollNumber: "ST-005", level: "NURSERY", className: "Nursery 1", guardianName: "Charles Osei", guardianEmail: "charles@osei.com" }
+];
 
 export const INITIAL_GRADING_SCALE: GradingScaleRule[] = [
   { grade: 'A1', minScore: 80, maxScore: 100, gpa: 4.0, remarks: 'HIGHEST' },
@@ -70,8 +76,21 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   selectedTemplate: 'dynamic'
 };
 
-export const INITIAL_USERS: User[] = [];
+export const INITIAL_USERS: User[] = [
+  { id: "tch-01", name: "Kojo Mensah (Nursery)", email: "nursery@eastfield.com", role: "TEACHER", password: "password123", level: "NURSERY", classes: ["Nursery 1", "Nursery 2"], subjects: ["LITERACY", "NUMERACY"] },
+  { id: "tch-02", name: "Ama Serwaa (Primary)", email: "primary@eastfield.com", role: "TEACHER", password: "password123", level: "PRIMARY", classes: ["Primary 1", "Primary 2"], subjects: ["Mathematics", "English language"] },
+  { id: "tch-03", name: "Kwesi Appiah (JHS)", email: "jhs@eastfield.com", role: "TEACHER", password: "password123", level: "JHS", classes: ["JHS 1", "JHS 2"], subjects: ["Mathematics", "Science"] }
+];
 
-export const INITIAL_GRADES: Grade[] = [];
+export const INITIAL_GRADES: Grade[] = [
+  { studentId: "st-101", subjectId: "sub-p-eng", classScore: 25, examScore: 60, totalScore: 85, gradeLetter: "A1", remarks: "EXCELLENT", term: "Term 1", year: "2025/2026", teacherId: "tch-02", updatedAt: new Date().toISOString() },
+  { studentId: "st-101", subjectId: "sub-p-math", classScore: 20, examScore: 55, totalScore: 75, gradeLetter: "B2", remarks: "VERY GOOD", term: "Term 1", year: "2025/2026", teacherId: "tch-02", updatedAt: new Date().toISOString() },
+  { studentId: "st-102", subjectId: "sub-p-eng", classScore: 22, examScore: 50, totalScore: 72, gradeLetter: "B2", remarks: "VERY GOOD", term: "Term 1", year: "2025/2026", teacherId: "tch-02", updatedAt: new Date().toISOString() },
+  { studentId: "st-103", subjectId: "sub-j-math", classScore: 28, examScore: 65, totalScore: 93, gradeLetter: "A1", remarks: "EXCELLENT", term: "Term 1", year: "2025/2026", teacherId: "tch-03", updatedAt: new Date().toISOString() }
+];
 
-export const INITIAL_ATTENDANCE: Attendance[] = [];
+export const INITIAL_ATTENDANCE: Attendance[] = [
+  { studentId: "st-101", term: "Term 1", year: "2025/2026", totalDays: 70, daysPresent: 68, remarks: "Very regular and punctual. Keep it up!", teacherId: "tch-02", updatedAt: new Date().toISOString() },
+  { studentId: "st-102", term: "Term 1", year: "2025/2026", totalDays: 70, daysPresent: 62, remarks: "Good attendance. Well done.", teacherId: "tch-02", updatedAt: new Date().toISOString() },
+  { studentId: "st-103", term: "Term 1", year: "2025/2026", totalDays: 70, daysPresent: 70, remarks: "Perfect attendance score!", teacherId: "tch-03", updatedAt: new Date().toISOString() }
+];

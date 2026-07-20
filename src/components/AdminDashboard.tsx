@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { Student, User, Subject, ReportConfig, Grade, Attendance, AcademicLevel } from '../types';
 import { Users, GraduationCap, School, BookOpen, Settings, Search, Plus, Edit2, Trash2, Sliders, Check, AlertCircle, FileSpreadsheet, Upload, Download, Image as ImageIcon, X, LogOut, Database, RefreshCw, Copy, CheckCircle2, ChevronRight, HelpCircle, Lock } from 'lucide-react';
 import ReportPDF from './ReportPDF';
-import { getSupabaseCredentials, SUPABASE_SQL_SCHEMA, getSupabaseClient } from '../lib/supabase';
+import { getSupabaseCredentials, SUPABASE_SQL_SCHEMA, getSupabaseClient, deleteSupabaseStudent, deleteSupabaseTeacher } from '../lib/supabase';
 
 interface AdminDashboardProps {
   students: Student[];
@@ -93,6 +93,10 @@ export default function AdminDashboard({
   // Transcript Selector state
   const [selectedClass, setSelectedClass] = useState('Primary 4');
   const [selectedStudentId, setSelectedStudentId] = useState('');
+
+  // Deletion confirmation states
+  const [confirmDeleteStudentId, setConfirmDeleteStudentId] = useState<string | null>(null);
+  const [confirmDeleteTeacherId, setConfirmDeleteTeacherId] = useState<string | null>(null);
 
   // Supabase dynamic setup fields
   const [dbSupabaseUrl, setDbSupabaseUrl] = useState(() => localStorage.getItem('ea_supabase_url') || '');
@@ -362,16 +366,24 @@ export default function AdminDashboard({
     setShowStudentModal(true);
   };
 
-  const handleDeleteStudent = (id: string) => {
-    if (confirm('Are you sure you want to delete this student record? This will exclude them from transcripts.')) {
-      setStudents(prev => prev.filter(s => s.id !== id));
-      if (selectedStudentId === id) setSelectedStudentId('');
+  const handleDeleteStudent = async (id: string) => {
+    setStudents(prev => prev.filter(s => s.id !== id));
+    if (selectedStudentId === id) setSelectedStudentId('');
+    
+    // Explicitly delete from Supabase if configured
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
+      await deleteSupabaseStudent(id);
     }
   };
 
-  const handleDeleteTeacher = (id: string) => {
-    if (confirm('Are you sure you want to delete this teacher? They will no longer have access to their grade book classes.')) {
-      setTeachers(prev => prev.filter(t => t.id !== id));
+  const handleDeleteTeacher = async (id: string) => {
+    setTeachers(prev => prev.filter(t => t.id !== id));
+    
+    // Explicitly delete from Supabase if configured
+    const creds = getSupabaseCredentials();
+    if (creds.isConfigured) {
+      await deleteSupabaseTeacher(id);
     }
   };
 
@@ -426,10 +438,15 @@ export default function AdminDashboard({
 
     if (editingTeacher) {
       // Edit Teacher
+      const emailToCheck = teacherForm.email.trim().toLowerCase();
+      if (teachers.some(t => t.id !== editingTeacher.id && t.email.trim().toLowerCase() === emailToCheck)) {
+        setTeacherError('A teacher with this email address is already registered.');
+        return;
+      }
       setTeachers(prev => prev.map(t => t.id === editingTeacher.id ? {
         ...t,
         name: teacherForm.name,
-        email: teacherForm.email,
+        email: teacherForm.email.trim(),
         level: teacherForm.level,
         classes: teacherForm.classes,
         subjects: finalSubjects
@@ -437,14 +454,15 @@ export default function AdminDashboard({
       setEditingTeacher(null);
     } else {
       // Add new Teacher
-      if (teachers.some(t => t.email.toLowerCase() === teacherForm.email.toLowerCase())) {
+      const emailToCheck = teacherForm.email.trim().toLowerCase();
+      if (teachers.some(t => t.email.trim().toLowerCase() === emailToCheck)) {
         setTeacherError('A teacher with this email address is already registered.');
         return;
       }
       const newTeacher: User = {
         id: `user-t-${Date.now()}`,
         name: teacherForm.name,
-        email: teacherForm.email,
+        email: teacherForm.email.trim(),
         role: 'TEACHER',
         level: teacherForm.level,
         classes: teacherForm.classes,
@@ -499,8 +517,13 @@ export default function AdminDashboard({
           alert('Junior High School (JHS) teachers are restricted to a maximum of two subjects.');
           return prev;
         }
-        // Conflict Check
-        const conflictingTeacher = teachers.find(t => t.level === 'JHS' && t.subjects?.includes(subId) && (!editingTeacher || t.id !== editingTeacher.id));
+        // Conflict Check with both ID, name, and code
+        const subObj = subjects.find(s => s.id === subId);
+        const conflictingTeacher = teachers.find(t => 
+          t.level === 'JHS' && 
+          t.subjects?.some(sId => sId === subId || (subObj && (sId === subObj.name || sId === subObj.code))) && 
+          (!editingTeacher || t.id !== editingTeacher.id)
+        );
         if (conflictingTeacher) {
           alert(`Strict Rule: This subject is already assigned to JHS teacher: ${conflictingTeacher.name}. Each JHS subject must only be assigned to a single teacher. Please edit that teacher first to remove/change it.`);
           return prev;
@@ -908,13 +931,33 @@ export default function AdminDashboard({
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteStudent(s.id)}
-                              className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
-                              title="Delete Pupil"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {confirmDeleteStudentId === s.id ? (
+                              <div className="flex items-center gap-1.5 animate-pulse">
+                                <button
+                                  onClick={() => {
+                                    handleDeleteStudent(s.id);
+                                    setConfirmDeleteStudentId(null);
+                                  }}
+                                  className="px-2 py-0.5 bg-rose-600 text-white font-bold rounded text-[9px] hover:bg-rose-700 cursor-pointer"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteStudentId(null)}
+                                  className="px-2 py-0.5 bg-gray-200 text-gray-700 font-bold rounded text-[9px] hover:bg-gray-300 cursor-pointer"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteStudentId(s.id)}
+                                className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
+                                title="Delete Pupil"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1062,17 +1105,6 @@ export default function AdminDashboard({
         <div className="space-y-4 animate-fadeIn">
           <div className="flex justify-between items-center">
             <h3 className="font-display font-bold text-mauve-900 text-base uppercase tracking-wide">Staff Directory</h3>
-            <button
-              onClick={() => {
-                setEditingTeacher(null);
-                setTeacherForm({ name: '', email: '', level: 'PRIMARY', classes: [], subjects: [] });
-                setTeacherError('');
-                setShowTeacherModal(true);
-              }}
-              className="bg-mauve-900 hover:bg-mauve-700 text-white font-bold px-4 py-2 rounded transition flex items-center gap-1.5 cursor-pointer shadow-sm text-xs uppercase tracking-wider"
-            >
-              <Plus className="w-3.5 h-3.5" /> Register New Teacher
-            </button>
           </div>
 
           <div className="bg-white p-3 rounded border border-mauve-500/20 text-xs text-mauve-900 leading-relaxed flex items-start gap-2 bg-mauve-50/15 shadow-sm">
@@ -1114,8 +1146,8 @@ export default function AdminDashboard({
                     </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1 max-w-xs">
-                        {t.classes?.map(c => (
-                          <span key={c} className="bg-gray-50 border border-gray-150 px-1.5 py-0.5 rounded text-[10px] text-gray-600 font-bold">
+                        {t.classes?.map((c, idx) => (
+                          <span key={`${c}-${idx}`} className="bg-gray-50 border border-gray-150 px-1.5 py-0.5 rounded text-[10px] text-gray-600 font-bold">
                             {c}
                           </span>
                         ))}
@@ -1123,10 +1155,10 @@ export default function AdminDashboard({
                     </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1 max-w-sm">
-                        {t.subjects?.map(sId => {
+                        {t.subjects?.map((sId, idx) => {
                           const sub = subjects.find(s => s.id === sId);
                           return (
-                            <span key={sId} className="bg-mauve-50 border border-mauve-500/10 px-1.5 py-0.5 rounded text-[10px] text-mauve-900 font-bold">
+                            <span key={`${sId}-${idx}`} className="bg-mauve-50 border border-mauve-500/10 px-1.5 py-0.5 rounded text-[10px] text-mauve-900 font-bold">
                               {sub ? sub.name : 'Subject'}
                             </span>
                           );
@@ -1166,13 +1198,33 @@ export default function AdminDashboard({
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteTeacher(t.id)}
-                          className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
-                          title="Delete Teacher Staff"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {confirmDeleteTeacherId === t.id ? (
+                          <div className="flex items-center gap-1.5 animate-pulse">
+                            <button
+                              onClick={() => {
+                                handleDeleteTeacher(t.id);
+                                setConfirmDeleteTeacherId(null);
+                              }}
+                              className="px-2 py-0.5 bg-rose-600 text-white font-bold rounded text-[9px] hover:bg-rose-700 cursor-pointer"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteTeacherId(null)}
+                              className="px-2 py-0.5 bg-gray-200 text-gray-700 font-bold rounded text-[9px] hover:bg-gray-300 cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteTeacherId(t.id)}
+                            className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition cursor-pointer"
+                            title="Delete Teacher Staff"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1214,7 +1266,8 @@ export default function AdminDashboard({
                         placeholder="Mrs. Mary Mensah"
                         value={teacherForm.name}
                         onChange={(e) => setTeacherForm({ ...teacherForm, name: e.target.value })}
-                        className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white"
+                        disabled={!!editingTeacher}
+                        className={`w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white ${editingTeacher ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed' : ''}`}
                       />
                     </div>
 
@@ -1226,7 +1279,8 @@ export default function AdminDashboard({
                         placeholder="mary@eastfield.com"
                         value={teacherForm.email}
                         onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
-                        className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white"
+                        disabled={!!editingTeacher}
+                        className={`w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-mauve-900 bg-white ${editingTeacher ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed' : ''}`}
                       />
                     </div>
                   </div>
@@ -1238,12 +1292,13 @@ export default function AdminDashboard({
                         <button
                           key={l}
                           type="button"
+                          disabled={!!editingTeacher}
                           onClick={() => handleTeacherLevelChange(l as AcademicLevel)}
-                          className={`flex-1 py-2 text-xs font-semibold border rounded-xl transition cursor-pointer ${
+                          className={`flex-1 py-2 text-xs font-semibold border rounded-xl transition ${
                             teacherForm.level === l
                               ? 'bg-mauve-100 border-mauve-400 text-mauve-900'
                               : 'border-mauve-200 hover:bg-mauve-50 text-mauve-600'
-                          }`}
+                          } ${editingTeacher ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           {l}
                         </button>
@@ -1265,8 +1320,9 @@ export default function AdminDashboard({
                           <button
                             key={c}
                             type="button"
+                            disabled={!!editingTeacher}
                             onClick={() => toggleClassForTeacherForm(c)}
-                            className={`px-2.5 py-1 text-xs border rounded-lg cursor-pointer transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'}`}
+                            className={`px-2.5 py-1 text-xs border rounded-lg transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'} ${editingTeacher ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {c}
                           </button>
@@ -1278,8 +1334,9 @@ export default function AdminDashboard({
                           <button
                             key={c}
                             type="button"
+                            disabled={!!editingTeacher}
                             onClick={() => toggleClassForTeacherForm(c)}
-                            className={`px-2.5 py-1 text-xs border rounded-lg cursor-pointer transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'}`}
+                            className={`px-2.5 py-1 text-xs border rounded-lg transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'} ${editingTeacher ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {c}
                           </button>
@@ -1291,8 +1348,9 @@ export default function AdminDashboard({
                           <button
                             key={c}
                             type="button"
+                            disabled={!!editingTeacher}
                             onClick={() => toggleClassForTeacherForm(c)}
-                            className={`px-2.5 py-1 text-xs border rounded-lg cursor-pointer transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'}`}
+                            className={`px-2.5 py-1 text-xs border rounded-lg transition ${isSel ? 'bg-mauve-600 text-white border-mauve-700 font-bold' : 'bg-white text-mauve-700 border-mauve-200 hover:bg-mauve-50'} ${editingTeacher ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {c}
                           </button>
@@ -1320,7 +1378,9 @@ export default function AdminDashboard({
                     <div className="flex flex-wrap gap-1.5 p-3 rounded-xl border border-mauve-150 bg-mauve-50/25 max-h-[140px] overflow-y-auto">
                       {subjects.filter((s) => s.level === teacherForm.level).map(sub => {
                         const isSel = teacherForm.subjects.includes(sub.id);
-                        const assignedTeacher = teacherForm.level === 'JHS' ? teachers.find(t => t.level === 'JHS' && t.subjects?.includes(sub.id) && (!editingTeacher || t.id !== editingTeacher.id)) : null;
+                        const assignedTeacher = teacherForm.level === 'JHS' 
+                          ? teachers.find(t => t.level === 'JHS' && t.subjects?.some(sId => sId === sub.id || sId === sub.name || sId === sub.code) && (!editingTeacher || t.id !== editingTeacher.id)) 
+                          : null;
                         const isUnavailable = !!assignedTeacher;
 
                         return (
@@ -1603,220 +1663,6 @@ export default function AdminDashboard({
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          {/* F. SUPABASE CLOUD DATABASE SYNC ENGINE */}
-          <div className="pt-6 border-t border-mauve-200 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-mauve-900" />
-                <h4 className="font-display font-bold text-mauve-900 text-sm uppercase tracking-wider">Supabase Cloud Database Integration</h4>
-              </div>
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                supabaseStatus?.isConnected 
-                  ? 'bg-emerald-100 text-emerald-800' 
-                  : supabaseStatus?.isConfigured 
-                    ? 'bg-amber-100 text-amber-800' 
-                    : 'bg-rose-100 text-rose-800'
-              }`}>
-                {supabaseStatus?.isConnected 
-                  ? '● Live Sync Online' 
-                  : supabaseStatus?.isConfigured 
-                    ? '● Offline (Config Error)' 
-                    : '● Shared Default DB'}
-              </span>
-            </div>
-
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Configure your own personal Supabase database to persist all reports, class grades, student admissions, and staff data permanently. Standard live sync operates in the background automatically as you record grades or edit student files.
-            </p>
-
-            {/* Active Credentials Summary Card */}
-            <div className="p-4 bg-white border border-mauve-100 rounded-xl space-y-2.5 text-xs shadow-sm">
-              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Active Database Profile</span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Config Source</span>
-                  <span className="font-bold text-mauve-900 block">
-                    {(() => {
-                      const creds = getSupabaseCredentials();
-                      if (creds.source === 'localStorage') return 'Custom Credentials (Browser)';
-                      if (creds.source === 'env') return 'System Environment (.env)';
-                      return 'Default Academy DB (Shared)';
-                    })()}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Active Project URL</span>
-                  <span className="font-mono text-mauve-900 block truncate" title={getSupabaseCredentials().url}>
-                    {getSupabaseCredentials().url || 'Not configured'}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-gray-500 text-[10px] uppercase font-bold block">Anon Key Status</span>
-                  <span className="font-mono text-mauve-900 block">
-                    {getSupabaseCredentials().key ? '•••••••••••••••• (Active)' : 'Not configured'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sync Controls (Push & Pull) */}
-            <div className="p-4 bg-mauve-50/40 rounded-xl border border-mauve-100 space-y-3.5">
-              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Manual Synchronization Commands</span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
-                <div className="space-y-1">
-                  <span className="font-bold text-gray-800">1. Push Local State to Cloud</span>
-                  <p className="text-[11px] text-gray-500 leading-normal">
-                    Overwrites remote database tables with your current browser local storage database. Use this to seed a newly created database.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={isSupabaseSyncing}
-                    onClick={async () => {
-                      if (onPushToSupabase) {
-                        const ok = await onPushToSupabase();
-                        if (ok) {
-                          alert('Successfully synchronized and uploaded all local records to your Supabase Cloud Database!');
-                        } else {
-                          alert('Push failed. Ensure your database tables are created correctly using the SQL Schema below.');
-                        }
-                      }
-                    }}
-                    className="mt-1.5 px-3 py-1.5 bg-mauve-900 hover:bg-mauve-700 disabled:opacity-50 text-white font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    {isSupabaseSyncing ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="w-3.5 h-3.5" />
-                    )}
-                    {isSupabaseSyncing ? 'Syncing...' : 'Push Local Data to Cloud'}
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="font-bold text-gray-800">2. Pull Remote State to Browser</span>
-                  <p className="text-[11px] text-gray-500 leading-normal">
-                    Downloads the latest synchronized student registers, staff allocations, and grading sheets from Supabase, updating your browser storage.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={isSupabaseSyncing}
-                    onClick={async () => {
-                      if (onPullFromSupabase) {
-                        const ok = await onPullFromSupabase();
-                        if (ok) {
-                          alert('Successfully downloaded and synchronized latest cloud database records!');
-                        } else {
-                          alert('Pull failed. Ensure your database connection is active and tables exist.');
-                        }
-                      }
-                    }}
-                    className="mt-1.5 px-3 py-1.5 bg-white hover:bg-mauve-50 disabled:opacity-50 text-mauve-900 border border-mauve-300 font-bold rounded text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    {isSupabaseSyncing ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Download className="w-3.5 h-3.5" />
-                    )}
-                    {isSupabaseSyncing ? 'Syncing...' : 'Pull Cloud Data to Browser'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Custom Database Credentials Form */}
-            <form onSubmit={handleSaveSupabaseCredentials} className="space-y-3.5 text-xs border border-mauve-100 rounded-xl p-4 bg-white shadow-sm">
-              <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Connect Your Custom Supabase Project</span>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-mauve-700 block">Supabase Project URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://your-project.supabase.co"
-                    value={dbSupabaseUrl}
-                    onChange={(e) => setDbSupabaseUrl(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none font-mono text-xs bg-white text-mauve-900"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-mauve-700 block">Supabase Anon Key</label>
-                  <input
-                    type="password"
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX..."
-                    value={dbSupabaseAnonKey}
-                    onChange={(e) => setDbSupabaseAnonKey(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none font-mono text-xs bg-white text-mauve-900"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-1">
-                <button
-                  type="button"
-                  onClick={handleResetSupabaseCredentials}
-                  className="px-3.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-[11px] uppercase tracking-wider transition cursor-pointer border border-gray-200"
-                >
-                  Reset to Default DB
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-mauve-900 hover:bg-mauve-700 text-white font-bold rounded-xl text-[11px] uppercase tracking-wider transition cursor-pointer shadow-sm"
-                >
-                  Save & Validate Connection
-                </button>
-              </div>
-
-              {testStatus.type && (
-                <div className={`p-3 rounded text-[11px] border leading-normal ${
-                  testStatus.type === 'success' 
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-100' 
-                    : 'bg-rose-50 text-rose-800 border-rose-100'
-                }`}>
-                  {testStatus.msg}
-                </div>
-              )}
-            </form>
-
-            {/* SQL Schema Script toggle */}
-            <div className="border border-mauve-100 rounded-xl p-4 bg-white shadow-sm space-y-2.5">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="text-[11px] font-bold text-mauve-800 uppercase tracking-widest block">Database Schema Initialization</span>
-                  <span className="text-[10px] text-gray-500">Run this SQL code in your Supabase SQL Editor to configure tables & policies</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSqlSchema(!showSqlSchema)}
-                  className="text-[10px] font-bold uppercase tracking-wider text-mauve-900 bg-mauve-100 px-3 py-1.5 rounded hover:bg-mauve-200 transition cursor-pointer"
-                >
-                  {showSqlSchema ? 'Hide Schema SQL' : 'Show Schema SQL'}
-                </button>
-              </div>
-
-              {showSqlSchema && (
-                <div className="space-y-2.5 animate-fadeIn">
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
-                        setCopiedSql(true);
-                        setTimeout(() => setCopiedSql(false), 2000);
-                      }}
-                      className="text-[10px] font-bold text-mauve-900 bg-mauve-50 hover:bg-mauve-100 border border-mauve-200 px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1"
-                    >
-                      {copiedSql ? '✓ Copied SQL!' : 'Copy SQL Schema'}
-                    </button>
-                  </div>
-                  <pre className="p-3 bg-gray-950 text-gray-200 rounded-lg overflow-auto max-h-60 text-[10px] font-mono leading-normal select-all">
-                    {SUPABASE_SQL_SCHEMA}
-                  </pre>
-                </div>
-              )}
             </div>
           </div>
 

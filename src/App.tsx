@@ -223,12 +223,6 @@ export default function App() {
 
   // 1. INITIALIZE MASTER STATES FROM LOCALSTORAGE OR MOCK DATA
   useEffect(() => {
-    const demoStudentIds = [
-      'st-01', 'st-02', 'st-03', 'st-04', 'st-05', 'st-06', 'st-07', 'st-07a', 'st-07b',
-      'st-08', 'st-09', 'st-10', 'st-11', 'st-12', 'st-13', 'st-14', 'st-15', 'st-16', 'st-17', 'st-18', 'st-19'
-    ];
-    const demoTeacherEmails = ['nursery@eastfield.com', 'primary@eastfield.com', 'jhs@eastfield.com'];
-
     const cachedStudents = localStorage.getItem('ea_students');
     const cachedTeachers = localStorage.getItem('ea_teachers');
     const cachedGrades = localStorage.getItem('ea_grades');
@@ -236,44 +230,52 @@ export default function App() {
     const cachedConfig = localStorage.getItem('ea_config');
 
     let finalStudents: Student[] = [];
-    if (cachedStudents) {
-      const parsed = JSON.parse(cachedStudents) as Student[];
-      finalStudents = parsed.filter(s => !demoStudentIds.includes(s.id));
-    }
-    if (finalStudents.length === 0) {
+    if (cachedStudents !== null) {
+      try {
+        finalStudents = JSON.parse(cachedStudents) as Student[];
+      } catch (e) {
+        finalStudents = INITIAL_STUDENTS;
+      }
+    } else {
       finalStudents = INITIAL_STUDENTS;
     }
     setStudents(finalStudents);
     localStorage.setItem('ea_students', JSON.stringify(finalStudents));
 
     let finalTeachers: User[] = [];
-    if (cachedTeachers) {
-      const parsed = JSON.parse(cachedTeachers) as User[];
-      finalTeachers = parsed.filter(t => !demoTeacherEmails.includes(t.email.toLowerCase()));
-    }
-    if (finalTeachers.length === 0) {
+    if (cachedTeachers !== null) {
+      try {
+        finalTeachers = JSON.parse(cachedTeachers) as User[];
+      } catch (e) {
+        finalTeachers = INITIAL_USERS;
+      }
+    } else {
       finalTeachers = INITIAL_USERS;
     }
     setTeachers(finalTeachers);
     localStorage.setItem('ea_teachers', JSON.stringify(finalTeachers));
 
     let finalGrades: Grade[] = [];
-    if (cachedGrades) {
-      const parsed = JSON.parse(cachedGrades) as Grade[];
-      finalGrades = parsed.filter(g => !demoStudentIds.includes(g.studentId));
-    }
-    if (finalGrades.length === 0) {
+    if (cachedGrades !== null) {
+      try {
+        finalGrades = JSON.parse(cachedGrades) as Grade[];
+      } catch (e) {
+        finalGrades = INITIAL_GRADES;
+      }
+    } else {
       finalGrades = INITIAL_GRADES;
     }
     setGrades(finalGrades);
     localStorage.setItem('ea_grades', JSON.stringify(finalGrades));
 
     let finalAttendance: Attendance[] = [];
-    if (cachedAttendance) {
-      const parsed = JSON.parse(cachedAttendance) as Attendance[];
-      finalAttendance = parsed.filter(a => !demoStudentIds.includes(a.studentId));
-    }
-    if (finalAttendance.length === 0) {
+    if (cachedAttendance !== null) {
+      try {
+        finalAttendance = JSON.parse(cachedAttendance) as Attendance[];
+      } catch (e) {
+        finalAttendance = INITIAL_ATTENDANCE;
+      }
+    } else {
       finalAttendance = INITIAL_ATTENDANCE;
     }
     setAttendance(finalAttendance);

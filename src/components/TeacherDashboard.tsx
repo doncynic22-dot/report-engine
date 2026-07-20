@@ -116,7 +116,8 @@ export default function TeacherDashboard({
       return;
     }
 
-    if (teachers.some(t => t.email.toLowerCase() === regEmail.toLowerCase())) {
+    const emailToCheck = regEmail.trim().toLowerCase();
+    if (teachers.some(t => t.email.trim().toLowerCase() === emailToCheck)) {
       setRegError('A staff member with this email is already registered.');
       return;
     }
@@ -162,7 +163,7 @@ export default function TeacherDashboard({
     const newTeacher: User = {
       id: data.user?.id || `user-t-reg-${Date.now()}`,
       name: regName,
-      email: regEmail,
+      email: regEmail.trim(),
       role: 'TEACHER',
       level: regLevel,
       classes: regSelectedClasses,
@@ -179,9 +180,9 @@ export default function TeacherDashboard({
     setRegPassword('');
     setRegSelectedClasses([]);
     setRegSelectedSubjects([]);
-    setSelectedLevel('');
-    setSelectedClass('');
-    setSelectedSubject('');
+    setSelectedLevel(regLevel);
+    setSelectedClass(regSelectedClasses[0] || '');
+    setSelectedSubject(finalSubjects[0] || '');
 
     // Redirect the user to their dashboard ("/")
     window.history.pushState({}, '', '/');
@@ -344,8 +345,12 @@ export default function TeacherDashboard({
           alert('Strict Rule: JHS Teachers cannot select more than two subjects.');
           return prev;
         }
-        // Conflict Check
-        const conflictingTeacher = teachers.find(t => t.level === 'JHS' && t.subjects?.includes(subId));
+        // Conflict Check with both ID, name, and code
+        const subObj = subjects.find(s => s.id === subId);
+        const conflictingTeacher = teachers.find(t => 
+          t.level === 'JHS' && 
+          t.subjects?.some(sId => sId === subId || (subObj && (sId === subObj.name || sId === subObj.code)))
+        );
         if (conflictingTeacher) {
           alert(`Strict Rule: This subject is already assigned to JHS teacher: ${conflictingTeacher.name}. Each JHS subject must only be assigned to a single teacher.`);
           return prev;
@@ -985,7 +990,9 @@ export default function TeacherDashboard({
                 <div className="flex flex-wrap gap-1 p-2 rounded border border-mauve-500/10 bg-mauve-50 max-h-[120px] overflow-y-auto">
                   {subjects.filter(s => s.level === regLevel).map(sub => {
                     const isSel = regSelectedSubjects.includes(sub.id);
-                    const assignedTeacher = regLevel === 'JHS' ? teachers.find(t => t.level === 'JHS' && t.subjects?.includes(sub.id)) : null;
+                    const assignedTeacher = regLevel === 'JHS' 
+                      ? teachers.find(t => t.level === 'JHS' && t.subjects?.some(sId => sId === sub.id || sId === sub.name || sId === sub.code)) 
+                      : null;
                     const isUnavailable = !!assignedTeacher;
 
                     return (
@@ -1232,9 +1239,9 @@ export default function TeacherDashboard({
           </div>
 
           {saveSuccess && (
-            <div className="bg-green-50 text-green-700 border border-green-200 p-3.5 rounded-lg text-xs font-bold flex items-center gap-2.5 animate-fadeIn shadow-sm">
+            <div id="save-success-msg" className="bg-green-50 text-green-700 border border-green-200 p-3.5 rounded-lg text-xs font-bold flex items-center gap-2.5 animate-fadeIn shadow-sm">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
-              <span>Assessment successfully submitted to the Eastfield Admin Database</span>
+              <span>assessment succesfully saved</span>
             </div>
           )}
 

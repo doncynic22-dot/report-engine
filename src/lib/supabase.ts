@@ -311,6 +311,15 @@ export async function saveSupabaseStudents(students: Student[]): Promise<boolean
       updated_at: new Date().toISOString()
     }));
     const { error } = await client.from('ea_students').upsert(payloads);
+    
+    // Prune deleted students
+    const studentIds = students.map(s => s.id);
+    if (studentIds.length > 0) {
+      await client.from('ea_students').delete().not('id', 'in', `(${studentIds.join(',')})`);
+    } else {
+      await client.from('ea_students').delete().neq('id', '');
+    }
+
     return !error;
   } catch {
     return false;
@@ -355,6 +364,40 @@ export async function saveSupabaseTeachers(teachers: User[]): Promise<boolean> {
       updated_at: new Date().toISOString()
     }));
     const { error } = await client.from('ea_teachers').upsert(payloads);
+
+    // Prune deleted teachers
+    const teacherIds = teachers.map(t => t.id);
+    if (teacherIds.length > 0) {
+      await client.from('ea_teachers').delete().not('id', 'in', `(${teacherIds.join(',')})`);
+    } else {
+      await client.from('ea_teachers').delete().neq('id', '');
+    }
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSupabaseStudent(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  try {
+    const { error } = await client.from('ea_students').delete().eq('id', id);
+    // Also delete any associated grades or attendance to keep database clean
+    await client.from('ea_grades').delete().eq('student_id', id);
+    await client.from('ea_attendance').delete().eq('student_id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSupabaseTeacher(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  try {
+    const { error } = await client.from('ea_teachers').delete().eq('id', id);
     return !error;
   } catch {
     return false;

@@ -1379,11 +1379,11 @@ export default function ReportPDF({
                         </td>
                       </tr>
                     ) : (
-                      studentGrades.map((g) => {
+                      studentGrades.map((g, index) => {
                         const matchedSub = subjects.find((sub) => sub.id === g.subjectId);
                         const gradeInfo = getGradeDetails(g.totalScore);
                         return (
-                           <tr key={g.subjectId} className="hover:bg-mauve-50/10">
+                           <tr key={`${g.subjectId}-${index}`} className="hover:bg-mauve-50/10">
                             <td className="p-3 pl-4 bg-white">
                               <span className="block font-bold text-gray-900">
                                 {matchedSub ? matchedSub.name : 'Unknown Subject'}

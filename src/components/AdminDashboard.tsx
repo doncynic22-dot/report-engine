@@ -1666,6 +1666,236 @@ export default function AdminDashboard({
             </div>
           </div>
 
+          {/* F. SUPABASE CLOUD DATABASE SYNC MANAGER */}
+          <div className="pt-6 border-t border-mauve-200 space-y-4">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-mauve-900" />
+              <h4 className="font-display font-bold text-mauve-900 text-sm uppercase tracking-wider">Supabase Cloud Sync & Storage</h4>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Synchronize student transcripts, class registers, and teacher credentials across multiple devices. Overriding database credentials here stores them in your local browser cache (active only on this machine). Deployed versions on Vercel should use system environment variables to sync globally for all users.
+            </p>
+
+            {/* Current Connection Status Box */}
+            <div className="p-4 bg-mauve-50/40 rounded-xl border border-mauve-100 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-mauve-600 uppercase">Connection Status</span>
+                <div className="flex items-center gap-2 mt-1">
+                  {supabaseStatus?.isConnected ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
+                      ● Active & Synced
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase">
+                      ● Disconnected / Local Only
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1 leading-tight">{supabaseStatus?.message || 'Verification pending. Click test connection below.'}</p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-mauve-600 uppercase">Credentials Source</span>
+                <div className="mt-1">
+                  {getSupabaseCredentials().source === 'localStorage' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 uppercase">
+                      Local Browser Override
+                    </span>
+                  )}
+                  {getSupabaseCredentials().source === 'env' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase">
+                      Global Vercel Env Var
+                    </span>
+                  )}
+                  {getSupabaseCredentials().source === 'default' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase">
+                      Sandbox Demo Mode
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1 leading-tight">
+                  {getSupabaseCredentials().source === 'localStorage' 
+                    ? 'Active only in this browser. Friends on other devices will not see your changes unless they configure the same credentials.' 
+                    : getSupabaseCredentials().source === 'env' 
+                      ? 'Loaded from deployment settings. Synchronized for everyone worldwide!' 
+                      : 'Using shared default demo space. Highly unstable during concurrent edits.'}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-mauve-600 uppercase">Active API Endpoint</span>
+                <p className="font-mono text-[10px] text-mauve-900 bg-white/60 p-1.5 rounded border border-mauve-100 truncate mt-1">
+                  {getSupabaseCredentials().url || 'https://...'}
+                </p>
+              </div>
+            </div>
+
+            {/* Credentials Configuration Input Fields */}
+            <form onSubmit={handleSaveSupabaseCredentials} className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-mauve-700 block">Supabase Project URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://xxxx.supabase.co"
+                    value={dbSupabaseUrl}
+                    onChange={(e) => setDbSupabaseUrl(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-xs text-mauve-900 font-mono bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-mauve-700 block">Supabase Anon API Key</label>
+                  <input
+                    type="password"
+                    placeholder="Enter supabase public anon key"
+                    value={dbSupabaseAnonKey}
+                    onChange={(e) => setDbSupabaseAnonKey(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-mauve-200 focus:ring-2 focus:ring-mauve-500 outline-none text-xs text-mauve-900 font-mono bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex gap-2.5">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-mauve-900 hover:bg-mauve-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shadow-sm flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save & Test Connection</span>
+                  </button>
+
+                  {getSupabaseCredentials().source === 'localStorage' && (
+                    <button
+                      type="button"
+                      onClick={handleResetSupabaseCredentials}
+                      className="px-4 py-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shadow-sm flex items-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Reset to Env Defaults</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Pull / Push triggers */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={isSupabaseSyncing}
+                    onClick={async () => {
+                      if (onPullFromSupabase) {
+                        const success = await onPullFromSupabase();
+                        if (success) {
+                          setTestStatus({ type: 'success', msg: 'Latest cloud data successfully pulled and loaded!' });
+                        } else {
+                          setTestStatus({ type: 'error', msg: 'Pull failed. Verify your Supabase connection and tables.' });
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 bg-mauve-50 hover:bg-mauve-100 text-mauve-900 border border-mauve-200/60 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSupabaseSyncing ? 'animate-spin' : ''}`} />
+                    <span>Manual Pull</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isSupabaseSyncing}
+                    onClick={async () => {
+                      if (onPushToSupabase) {
+                        const success = await onPushToSupabase();
+                        if (success) {
+                          setTestStatus({ type: 'success', msg: 'All local student, teacher, and grade records backed up to cloud!' });
+                        } else {
+                          setTestStatus({ type: 'error', msg: 'Push backup failed. Verify database connectivity and schema tables.' });
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/60 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition disabled:opacity-50"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>Manual Push Backup</span>
+                  </button>
+                </div>
+              </div>
+
+              {testStatus.type && (
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                  testStatus.type === 'success' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}>
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">{testStatus.type === 'success' ? 'Success: ' : 'Error: '}</span>
+                    {testStatus.msg}
+                  </div>
+                </div>
+              )}
+            </form>
+
+            {/* Collapsible Supabase Schema setup */}
+            <div className="pt-2 border border-mauve-100 bg-mauve-50/10 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowSqlSchema(!showSqlSchema)}
+                className="w-full px-4 py-3 bg-mauve-50/30 hover:bg-mauve-50/50 flex items-center justify-between text-xs font-bold text-mauve-900 transition cursor-pointer border-b border-mauve-100/50"
+              >
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-mauve-700" />
+                  <span>How to Set Up Your Supabase Database Schema</span>
+                </div>
+                <span className="text-mauve-600 font-mono">{showSqlSchema ? 'Hide Setup Guides ▲' : 'Show Setup Guides ▼'}</span>
+              </button>
+
+              {showSqlSchema && (
+                <div className="p-4 space-y-4 text-xs leading-relaxed animate-fadeIn bg-white">
+                  <div className="space-y-2 text-gray-600">
+                    <p className="font-semibold text-mauve-900">Setting up a fresh Supabase Project is simple:</p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] pl-1">
+                      <li>Log into your <a href="https://supabase.com" target="_blank" rel="noopener" className="text-mauve-700 underline font-semibold">Supabase Console</a> and create a new project.</li>
+                      <li>Navigate to the <span className="font-semibold text-mauve-900">SQL Editor</span> tab in the left sidebar.</li>
+                      <li>Click <span className="font-semibold text-mauve-900">"New Query"</span>, paste the SQL setup script below, and click <span className="font-semibold text-mauve-900">"Run"</span>.</li>
+                      <li>Configure your Vercel deployment by adding <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-[10px]">VITE_SUPABASE_URL</code> and <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-[10px]">VITE_SUPABASE_ANON_KEY</code> variables so your app synchronizes globally!</li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center bg-gray-50 p-2 rounded-t-lg border border-gray-200 border-b-0">
+                      <span className="font-mono text-[10px] text-gray-500 font-bold">SUPABASE SCHEMA SETUP SCRIPT (SQL)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+                          setCopiedSql(true);
+                          setTimeout(() => setCopiedSql(false), 2000);
+                        }}
+                        className="px-2.5 py-1 bg-mauve-900 hover:bg-mauve-700 text-white font-semibold rounded text-[10px] flex items-center gap-1 cursor-pointer transition uppercase tracking-wider"
+                      >
+                        {copiedSql ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy SQL Script</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="p-3 bg-gray-900 text-emerald-400 font-mono text-[10px] rounded-b-lg overflow-x-auto max-h-60 border border-gray-200">
+                      {SUPABASE_SQL_SCHEMA}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* G. ADMINISTRATIVE SECURITY PASSWORD SECTION */}
           <div className="pt-6 border-t border-mauve-200 space-y-4">
             <div className="flex items-center gap-2">

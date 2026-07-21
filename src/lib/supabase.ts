@@ -7,9 +7,9 @@ export function getSupabaseCredentials() {
   const defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpZ2NueWF3ZmhjeGNkanFkZmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNjY3MDksImV4cCI6MjA5OTg0MjcwOX0.Zt0-yT0RHcjzVsuC1ngohpU1SJfX8O1RtRafosEFZvc";
 
   // @ts-ignore
-  const envUrl = import.meta.env?.VITE_SUPABASE_URL || '';
+  const envUrl = import.meta.env?.VITE_SUPABASE_URL || import.meta.env?.SUPABASE_URL || (typeof process !== 'undefined' ? (process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL) : '') || '';
   // @ts-ignore
-  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? (process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY) : '') || '';
   
   const localUrl = localStorage.getItem('ea_supabase_url') || '';
   const localKey = localStorage.getItem('ea_supabase_anon_key') || '';
@@ -178,6 +178,46 @@ ON storage.objects
 FOR DELETE
 TO authenticated
 USING (bucket_id = 'eastfield');
+
+-- Option C: Folder-Level Security (Strict Auth Folder segregation for authenticated users)
+-- Uncomment these if you want users to ONLY be able to modify files within their own folder named after their User ID.
+-- Note: Make sure any file uploads prefix the path with the user's authenticated ID.
+-- 
+-- DROP POLICY IF EXISTS "Users can upload to own folder" ON storage.objects;
+-- CREATE POLICY "Users can upload to own folder"
+-- ON storage.objects FOR INSERT
+-- TO authenticated
+-- WITH CHECK (
+--   bucket_id = 'eastfield'
+--   AND name LIKE (auth.uid()::text || '/%')
+-- );
+-- 
+-- DROP POLICY IF EXISTS "Users can update own files" ON storage.objects;
+-- CREATE POLICY "Users can update own files"
+-- ON storage.objects FOR UPDATE
+-- TO authenticated
+-- USING (
+--   bucket_id = 'eastfield'
+--   AND name LIKE (auth.uid()::text || '/%')
+-- );
+-- 
+-- DROP POLICY IF EXISTS "Users can delete own files" ON storage.objects;
+-- CREATE POLICY "Users can delete own files"
+-- ON storage.objects FOR DELETE
+-- TO authenticated
+-- USING (
+--   bucket_id = 'eastfield'
+--   AND name LIKE (auth.uid()::text || '/%')
+-- );
+-- 
+-- DROP POLICY IF EXISTS "Allow anyone to upload logos" ON storage.objects;
+-- CREATE POLICY "Allow anyone to upload logos"
+-- ON storage.objects FOR INSERT
+-- TO public
+-- WITH CHECK (
+--   bucket_id = 'eastfield'
+--   AND name LIKE 'logos/%'
+-- );
 
 -- Policy 5 (Fallback/Demo/Testing): Allow public/anonymous uploads & updates during local development or testing phase
 DROP POLICY IF EXISTS "Allow public uploads for testing" ON storage.objects;

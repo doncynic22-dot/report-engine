@@ -5,9 +5,9 @@ function getSupabaseCredentials() {
   const defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpZ2NueWF3ZmhjeGNkanFkZmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNjY3MDksImV4cCI6MjA5OTg0MjcwOX0.Zt0-yT0RHcjzVsuC1ngohpU1SJfX8O1RtRafosEFZvc";
 
   // @ts-ignore
-  const envUrl = import.meta.env?.VITE_SUPABASE_URL || '';
+  const envUrl = import.meta.env?.VITE_SUPABASE_URL || import.meta.env?.SUPABASE_URL || (typeof process !== 'undefined' ? (process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL) : '') || '';
   // @ts-ignore
-  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? (process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY) : '') || '';
   
   const localUrl = localStorage.getItem('ea_supabase_url') || '';
   const localKey = localStorage.getItem('ea_supabase_anon_key') || '';
